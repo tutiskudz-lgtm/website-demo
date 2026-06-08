@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FurniBay — Fumi AI Support Widget (Prototype)</title>
+<style>
+  :root{
+    --maroon:#590D22;
+    --maroon-soft:#7d2540;
+    --blue:#457B9D;
+    --blue-deep:#2f5d78;
+    --ink:#23262b;
+    --muted:#6b7178;
+    --line:#e7e3e0;
+    --bg:#f4f2ef;
+    --bot-bubble:#f0eeec;
+    --user-bubble:#457B9D;
+    --shadow:0 18px 50px rgba(40,20,30,.20);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    font-family:'Segoe UI',-apple-system,BlinkMacSystemFont,Helvetica,Arial,sans-serif;
+    color:var(--ink);
+    background:
+      radial-gradient(1100px 700px at 50% 0%, #efeae6, var(--bg) 70%);
+    overflow:hidden;
+    display:flex;align-items:center;justify-content:center;
+  }
+
+  /* ---------- Chat window (always-on, centered) ---------- */
+  .widget{
+    width:390px;max-width:calc(100vw - 32px);
+    height:600px;max-height:calc(100vh - 40px);
+    background:#fff;border-radius:18px;box-shadow:var(--shadow);
+    display:flex;flex-direction:column;overflow:hidden}
+
+  .whead{background:linear-gradient(135deg,var(--maroon),#74203c);color:#fff;
+    padding:15px 18px;display:flex;align-items:center;gap:12px}
+  .avatar{width:38px;height:38px;border-radius:50%;background:#fff;display:flex;align-items:center;
+    justify-content:center;color:var(--maroon);font-weight:800;font-size:15px;flex-shrink:0}
+  .whead .who{font-weight:700;font-size:15px;line-height:1.1}
+  .whead .stat{font-size:11px;opacity:.85;display:flex;align-items:center;gap:5px;margin-top:2px}
+  .whead .stat::before{content:"";width:7px;height:7px;border-radius:50%;background:#7CFC9B;display:inline-block}
+  .whead .x{margin-left:auto;background:transparent;border:none;color:#fff;font-size:20px;cursor:pointer;opacity:.85}
+  .whead .x:hover{opacity:1}
+
+  .msgs{flex:1;overflow-y:auto;padding:18px 16px;background:
+      linear-gradient(#fff,#fbfafa);display:flex;flex-direction:column;gap:12px}
+  .msgs::-webkit-scrollbar{width:6px}
+  .msgs::-webkit-scrollbar-thumb{background:#e2ddd9;border-radius:3px}
+
+  .row{display:flex;gap:8px;align-items:flex-end;animation:rise .3s ease both}
+  @keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+  .row.user{flex-direction:row-reverse}
+  .mini{width:26px;height:26px;border-radius:50%;background:var(--maroon);color:#fff;flex-shrink:0;
+    display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700}
+  .bubble{max-width:78%;padding:10px 13px;border-radius:14px;font-size:13.5px;line-height:1.5}
+  .bot .bubble{background:var(--bot-bubble);color:var(--ink);border-bottom-left-radius:4px}
+  .user .bubble{background:var(--user-bubble);color:#fff;border-bottom-right-radius:4px}
+  .bubble b{font-weight:700}
+  .ticket{margin-top:7px;font-size:12px;background:#fff;border:1px dashed var(--blue);
+    color:var(--blue-deep);border-radius:8px;padding:7px 9px}
+
+  .chips{display:flex;flex-wrap:wrap;gap:7px;padding:0 16px 8px}
+  .chip{background:#fff;border:1px solid var(--blue);color:var(--blue-deep);font-size:12.5px;
+    padding:7px 12px;border-radius:16px;cursor:pointer;transition:.18s;font-weight:600}
+  .chip:hover{background:var(--blue);color:#fff}
+  .chip.alt{border-color:var(--maroon);color:var(--maroon)}
+  .chip.alt:hover{background:var(--maroon);color:#fff}
+
+  .typing{display:flex;gap:4px;padding:11px 14px;background:var(--bot-bubble);
+    border-radius:14px;border-bottom-left-radius:4px;width:fit-content}
+  .typing span{width:7px;height:7px;border-radius:50%;background:#b7afa8;animation:blink 1.2s infinite}
+  .typing span:nth-child(2){animation-delay:.2s}.typing span:nth-child(3){animation-delay:.4s}
+  @keyframes blink{0%,60%,100%{opacity:.3}30%{opacity:1}}
+
+  .composer{border-top:1px solid var(--line);padding:10px 12px;display:flex;gap:8px;align-items:center;background:#fff}
+  .composer input{flex:1;border:1px solid var(--line);border-radius:20px;padding:10px 14px;font-size:13px;outline:none}
+  .composer input:focus{border-color:var(--blue)}
+  .composer button{width:38px;height:38px;border-radius:50%;border:none;background:var(--maroon);
+    color:#fff;cursor:pointer;font-size:16px;flex-shrink:0;transition:.2s}
+  .composer button:hover{background:var(--maroon-soft)}
+  .footnote{text-align:center;font-size:10px;color:var(--muted);padding:4px 0 8px;background:#fff}
+
+  .demobadge{position:fixed;left:18px;top:14px;z-index:60;background:var(--maroon);color:#fff;
+    font-size:11px;letter-spacing:.4px;padding:6px 12px;border-radius:14px;font-weight:600;opacity:.92}
+</style>
+</head>
+<body>
+  <!-- chat window (standalone) -->
+  <div class="widget open" id="widget" role="dialog" aria-label="Fumi AI support chat">
+    <div class="whead">
+      <div class="avatar">F</div>
+      <div><div class="who">Fumi AI</div><div class="stat">FurniBay virtual assistant</div></div>
+      <button class="x" id="closeBtn" aria-label="Close">×</button>
+    </div>
+    <div class="msgs" id="msgs"></div>
+    <div class="chips" id="chips"></div>
+    <div class="composer">
+      <input id="inp" placeholder="Write a message…" autocomplete="off">
+      <button id="send" aria-label="Send">↑</button>
+    </div>
+    <div class="footnote">Rule-assisted assistant · answers from FurniBay's approved policies</div>
+  </div>
+
+<script>
+/* ============================================================
+   FurniBay "Fumi AI" — rule-assisted prototype
+   Content is drawn from FurniBay's approved policies (Ch.1 / T&C).
+   Scope: delivery · inside-carrying · returns · right of withdrawal · order status.
+   Anything outside scope, or uncertain, hands over to a human.
+   ============================================================ */
+
+const msgs   = document.getElementById('msgs');
+const chips  = document.getElementById('chips');
+const inp    = document.getElementById('inp');
+const widget = document.getElementById('widget');
+
+// ---- approved answers (rule-assisted, from policy) ----
+const ANSWERS = {
+  delivery:{
+    label:"Delivery times",
+    text:"Our courier partners deliver on <b>standard working days during daytime hours</b>. Once your order ships, you'll get a tracking link by email. Delivery windows depend on the third-party courier, so exact times can vary.",
+    follow:["inside","status","returns"]
+  },
+  inside:{
+    label:"Inside-carrying",
+    text:"By default, delivery stops <b>where the cargo van can safely reach</b> — usually ground level or the parking area. Carrying items further (e.g. up to an apartment) must be arranged in advance. For a typical sofa, <b>inside-carrying costs €35</b>.",
+    follow:["delivery","handover","returns"]
+  },
+  returns:{
+    label:"Returns",
+    text:"You can return most items under your <b>14-day right of withdrawal</b>. Items must be <b>unassembled and in their original packaging</b>. For a standard change-of-mind return, the customer covers return shipping; for a <b>verified defective item, FurniBay covers the cost</b>.",
+    follow:["withdrawal","handover","status"]
+  },
+  withdrawal:{
+    label:"Right of withdrawal",
+    text:"Under EU rules, you have <b>14 days</b> from receiving your order to withdraw. Tell us within that period, return the item unused and in its original packaging, and we'll process your refund once it reaches our warehouse.",
+    follow:["returns","handover"]
+  },
+  status:{
+    label:"Order status",
+    text:"I can point you to your tracking. Please share your <b>order number</b> (e.g. FB-20451) and I'll pull up the latest delivery update from the courier.",
+    follow:["delivery","handover"],
+    expectsOrder:true
+  }
+};
+
+const TOPIC_CHIPS = [
+  {k:'delivery'},{k:'inside'},{k:'returns'},{k:'withdrawal'},{k:'status'},
+  {k:'handover', label:"Talk to a person", alt:true}
+];
+
+let ticketCounter = 4567;
+
+// ---- helpers ----
+function scrollDown(){ msgs.scrollTop = msgs.scrollHeight; }
+
+function addMsg(side, html, ticket){
+  const row=document.createElement('div'); row.className='row '+side;
+  const mini=document.createElement('div'); mini.className='mini'; mini.textContent = side==='bot'?'F':'You';
+  const b=document.createElement('div'); b.className='bubble'; b.innerHTML=html;
+  if(ticket){const t=document.createElement('div');t.className='ticket';t.innerHTML=ticket;b.appendChild(t);}
+  row.appendChild(mini); row.appendChild(b); msgs.appendChild(row); scrollDown();
+}
+
+function typing(cb){
+  const row=document.createElement('div'); row.className='row bot';
+  const mini=document.createElement('div'); mini.className='mini'; mini.textContent='F';
+  const t=document.createElement('div'); t.className='typing'; t.innerHTML='<span></span><span></span><span></span>';
+  row.appendChild(mini); row.appendChild(t); msgs.appendChild(row); scrollDown();
+  setTimeout(()=>{ row.remove(); cb(); }, 650);
+}
+
+function renderChips(keys){
+  chips.innerHTML='';
+  keys.forEach(k=>{
+    const def = TOPIC_CHIPS.find(c=>c.k===k) || {k};
+    const label = def.label || (ANSWERS[k]? ANSWERS[k].label : k);
+    const chip=document.createElement('button');
+    chip.className='chip'+(def.alt?' alt':'');
+    chip.textContent=label;
+    chip.onclick=()=>handleTopic(k, label);
+    chips.appendChild(chip);
+  });
+}
+
+function handleTopic(key, label){
+  addMsg('user', label);
+  chips.innerHTML='';
+  if(key==='handover'){ return doHandover(); }
+  const a=ANSWERS[key];
+  if(!a){ return fallback(); }
+  typing(()=>{
+    addMsg('bot', a.text);
+    renderChips([...(a.follow||[]), 'handover']);
+  });
+}
+
+function doHandover(){
+  typing(()=>{
+    ticketCounter++;
+    addMsg('bot',
+      "No problem — I'll connect you to our support team. They'll reply by email within working hours.",
+      "Priority ticket created · Ref #CS-"+ticketCounter);
+    renderChips(['delivery','returns','status']);
+  });
+}
+
+function fallback(){
+  typing(()=>{
+    addMsg('bot',
+      "I'm not fully sure about that one, and I don't want to give you a wrong answer. "+
+      "Let me hand you to a colleague who can help.");
+    typing(()=>{
+      ticketCounter++;
+      addMsg('bot',"You're in good hands.", "Support ticket created · Ref #CS-"+ticketCounter);
+      renderChips(['delivery','returns','status']);
+    });
+  });
+}
+
+// ---- free-text understanding (simple keyword routing, like a rule-assisted bot) ----
+function routeText(text){
+  const t=text.toLowerCase();
+  if(/\bfb-?\d{3,}/i.test(text)){ // looks like an order number
+    typing(()=>{ addMsg('bot',"Thanks! I've found your order. It's <b>with the courier and out for delivery</b> on the next working day — you'll get a time window by email. Anything else?");
+      renderChips(['delivery','returns','handover']); }); return; }
+  if(/(carry|carrying|upstairs|up the stairs|floor|apartment|inside)/.test(t)) return handleTopic('inside','Inside-carrying');
+  if(/(deliver|delivery|ship|when.*arrive|courier)/.test(t)) return handleTopic('delivery','Delivery times');
+  if(/(refund|return|send back|money back)/.test(t)) return handleTopic('returns','Returns');
+  if(/(withdraw|14 day|cancel|change my mind)/.test(t)) return handleTopic('withdrawal','Right of withdrawal');
+  if(/(track|order status|where.*order|status)/.test(t)) return handleTopic('status','Order status');
+  if(/(human|person|agent|someone|representative|talk|speak|help me)/.test(t)) return doHandover();
+  // genuinely out of scope -> honest fallback
+  return fallback();
+}
+
+function sendText(){
+  const v=inp.value.trim(); if(!v) return;
+  addMsg('user', v); inp.value=''; chips.innerHTML=''; routeText(v);
+}
+
+// ---- greeting ----
+function greet(){
+  msgs.innerHTML=''; 
+  typing(()=>{
+    addMsg('bot',"Good afternoon, and welcome to FurniBay! I'm <b>Fumi AI</b>, your virtual assistant. I can help with <b>delivery, inside-carrying, returns, the right of withdrawal and order status</b>. What can I help you with?");
+    renderChips(['delivery','inside','returns','withdrawal','status','handover']);
+  });
+}
+
+// ---- start immediately (standalone widget) ----
+const closeBtn=document.getElementById('closeBtn');
+if(closeBtn){ closeBtn.title="Restart chat"; closeBtn.onclick=greet; }
+document.getElementById('send').onclick=sendText;
+inp.addEventListener('keydown',e=>{ if(e.key==='Enter') sendText(); });
+greet();
+inp.focus();
+
+</script>
+</body>
+</html>
